@@ -338,7 +338,7 @@
 
             try {
                 // Ensure your backend is running on this port
-                const response = await fetch('https://mental-health-47aw.onrender.com', {
+                const response = await fetch('https://mental-health-47aw.onrender.com/predict', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)

@@ -6,35 +6,45 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Copy files to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          source: "."
-          target: "/home/ubuntu/Pro-1"
-          overwrite: true
-          debug: true
+      - name: Deploy files to EC2
+        shell: bash
+        run: |
+          set -e
+
+          DEPLOY_DIR="/home/ubuntu/Pro-1"
+
+          echo "Starting deployment..."
+
+          mkdir -p "$DEPLOY_DIR"
+
+          rsync -av \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='.env' \
+            --exclude='.venv/' \
+            --exclude='venv/' \
+            --exclude='__pycache__/' \
+            --exclude='*.pyc' \
+            "$GITHUB_WORKSPACE/" "$DEPLOY_DIR/"
+
+          echo "Files copied successfully."
 
       - name: Verify deployment
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            set -e
-            cd /home/ubuntu/Pro-1
-            echo "Deployment successful"
-            pwd
-            ls -la
+        shell: bash
+        run: |
+          set -e
+          cd /home/ubuntu/Pro-1
+          echo "Deployment successful"
+          pwd
+          ls -la

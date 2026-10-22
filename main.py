@@ -102,4 +102,4 @@ def predict(data: StudentData):
 
     return {
         "predicted_mental_health_score": round(float(prediction))
-    }
+    } 

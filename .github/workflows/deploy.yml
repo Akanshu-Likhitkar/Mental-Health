@@ -16,52 +16,16 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      # 1. Checkout repository
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. Configure SSH Key
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
-
-      # 3. Configure SSH connection
-      - name: Configure SSH Host
-        shell: bash
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
+      - name: Prepare Deployment
         run: |
           set -e
 
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
+          mkdir -p /home/ubuntu/Pro-1
 
-          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-
-      # 4. Create deployment directory
-      - name: Prepare EC2 Directory
-        shell: bash
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-        run: |
-          set -e
-
-          ssh "$EC2_USER@$EC2_HOST" \
-            "mkdir -p ~/Pro-1"
-
-      # 5. Upload project files
-      - name: Upload Project to EC2
-        shell: bash
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-        run: |
-          set -e
-
-          rsync -avz \
+          rsync -av --delete \
             --exclude='.git/' \
             --exclude='.github/' \
             --exclude='.venv/' \
@@ -69,47 +33,34 @@ jobs:
             --exclude='__pycache__/' \
             --exclude='*.pyc' \
             --exclude='.env' \
-            ./ "$EC2_USER@$EC2_HOST:~/Pro-1/"
+            ./ /home/ubuntu/Pro-1/
 
-      # 6. Install dependencies and restart FastAPI
-      - name: Deploy FastAPI Application
-        shell: bash
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
+      - name: Install Dependencies
         run: |
           set -e
 
-          ssh "$EC2_USER@$EC2_HOST" 'bash -s' <<'REMOTE'
-
-          set -e
-
-          cd ~/Pro-1
-
-          echo "Creating virtual environment..."
+          cd /home/ubuntu/Pro-1
 
           python3 -m venv venv
-
-          echo "Installing dependencies..."
 
           ./venv/bin/pip install --upgrade pip
           ./venv/bin/pip install -r requirements.txt
 
-          echo "Checking ML model..."
-
           test -f Mental_Health_Model.pkl
 
-          echo "Creating systemd service..."
+      - name: Configure FastAPI
+        run: |
+          set -e
 
-          sudo tee /etc/systemd/system/mental-health.service > /dev/null <<EOF
+          sudo tee /etc/systemd/system/mental-health.service > /dev/null <<'EOF'
           [Unit]
-          Description=Mental Health FastAPI Application
+          Description=Mental Health FastAPI
           After=network.target
 
           [Service]
-          User=$USER
-          WorkingDirectory=$HOME/Pro-1
-          ExecStart=$HOME/Pro-1/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+          User=ubuntu
+          WorkingDirectory=/home/ubuntu/Pro-1
+          ExecStart=/home/ubuntu/Pro-1/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
           Restart=always
           RestartSec=5
 
@@ -117,30 +68,23 @@ jobs:
           WantedBy=multi-user.target
           EOF
 
-          echo "Restarting application..."
+      - name: Restart FastAPI
+        run: |
+          set -e
 
           sudo systemctl daemon-reload
           sudo systemctl enable mental-health
           sudo systemctl restart mental-health
 
-          echo "Checking service status..."
+          sleep 5
 
           sudo systemctl is-active mental-health
 
-          echo "Deployment completed successfully!"
-
-          REMOTE
-
-      # 7. Verify deployment
       - name: Verify Application
-        shell: bash
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
         run: |
           set -e
 
-          ssh "$EC2_USER@$EC2_HOST" \
-            "curl --fail --silent http://127.0.0.1:8000/"
+          curl --fail --silent \
+            http://127.0.0.1:8000/
 
-          echo "Mental Health API is running successfully!"
+          echo "Mental Health API deployed successfully!"

@@ -53,6 +53,9 @@ class PredictionResponse(BaseModel):
 def greet():
     return "Hello! Welcome to the Mental Health Prediction API."
 
+@app.get("/")
+def hello():
+    return "Hello! Welcome to the  AWS."
 
 top_countries = [
     "United States",

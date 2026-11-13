@@ -53,7 +53,7 @@ class PredictionResponse(BaseModel):
 def greet():
     return "Hello! Welcome to the Mental Health Prediction API."
 
-@app.get("/")
+@app.get("/aa")
 def hello():
     return "Hello! Welcome to the  AWS."
 
